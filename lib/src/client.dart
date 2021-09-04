@@ -50,10 +50,10 @@ class Transport {
               RTCIceConnectionState.RTCIceConnectionStateDisconnected)
             {
               /* TODO: implement pc.restartIce for flutter_webrtc.
-        if (pc.restartIce) {
-          // this will trigger onNegotiationNeeded
-          pc.restartIce();
-        }*/
+              if (pc.restartIce) {
+                // this will trigger onNegotiationNeeded
+                pc.restartIce();
+              }*/
             }
         };
 
@@ -93,8 +93,7 @@ class Client {
         client.initialized = true;
       }
     };
-
-    client.signal.connect();
+    unawaited(client.signal.connect());
     return client;
   }
 
@@ -124,7 +123,6 @@ class Client {
 
   Future<void> publish(LocalStream stream) async {
     await stream.publish(transports[RolePub]!.pc!);
-    await onnegotiationneeded();
   }
 
   void close() {
@@ -163,7 +161,10 @@ class Client {
             var answer = await signal.join(sid, uid, offer);
             await pc.setRemoteDescription(answer);
             transports[RolePub]!.hasRemoteDescription = true;
-            transports[RolePub]!.candidates.forEach((c) => pc.addCandidate(c));
+            transports[RolePub]!
+                .candidates
+                .forEach((c) async => await pc.addCandidate(c));
+            pc.onRenegotiationNeeded = onnegotiationneeded;
           }));
         } catch (e) {
           completer.completeError(e);
@@ -192,7 +193,6 @@ class Client {
         if (WebRTC.platformIsWeb || WebRTC.platformIsAndroid) {
           //description.sdp = description.sdp?.replaceAll('640c1f', '42e01f');
         }
-        print('sub offer ${description.sdp}');
         await pc.setRemoteDescription(description);
         transports[RoleSub]!.candidates.forEach((c) => pc.addCandidate(c));
         transports[RoleSub]!.candidates = [];
@@ -202,7 +202,6 @@ class Client {
           //answer.sdp = answer.sdp?.replaceAll('42e01f', '640c1f');
         }
         signal.answer(answer);
-        print('sub answer ${answer.sdp}');
       }
     } catch (err) {
       log.error('negotiate: e => ${err.toString()}');
@@ -215,10 +214,8 @@ class Client {
       if (pc != null) {
         var offer = await pc.createOffer({});
         setPreferredCodec(offer);
-        print('pub offer ${offer.sdp}');
         await pc.setLocalDescription(offer);
         var answer = await signal.offer(offer);
-        print('pub answer ${answer.sdp}');
         await pc.setRemoteDescription(answer);
       }
     } catch (err, st) {
